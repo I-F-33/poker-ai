@@ -1,10 +1,12 @@
 from pokerkit import KuhnPokerHand, Automation, State, Deck, Street, Opening, BettingStructure
 from random import random
 import numpy as np
+import matplotlib.pyplot as plt
 
 # --- Constants ---
 # Actions: 0 = Pass/Check/Fold, 1 = Bet/Call
 NUM_ACTIONS = 2
+
 # Using strings for cards as in your example
 CARDS = ['J', 'Q', 'K']
 NUM_CARDS = len(CARDS)
@@ -113,9 +115,6 @@ def cfr(cards, history, reach_probabilities, active_player):
              # Payoff FOR Player 0
             payoff_p0 = 2 if player0_wins else -2
 
-        # Optional Debug Print (can remove later)
-        # print(f"  DEBUG Showdown: History='{history}', Cards={cards}, P0 wins={player0_wins}, Calculated P0 Payoff={payoff_p0}")
-
         # Return payoffs for (Player 0, Player 1)
         return np.array([payoff_p0, -payoff_p0])
     # --- End Revised Terminal State Checks ---
@@ -208,9 +207,68 @@ def train(iterations):
     else:
         for key, node in sorted_info_sets:
             print(node) # Uses the __str__ method of CFRNode
+    
+     # Calculate average game value
+    avg_game_value_p0 = utils[0] / iterations
+    avg_game_value_p1 = utils[1] / iterations
+    print(f"Average Game Value (P0 perspective): {avg_game_value_p0:.4f}")
+
+    
+
+# --- Function to Plot Strategies ---
+def plot_strategies(info_sets_to_plot):
+    """ Generates bar charts for the average strategy of specified info sets """
+    print("\nGenerating strategy plots...")
+
+    labels = []
+    pass_probs = [] # Probability of Action 0 (Pass/Check/Fold)
+    bet_probs = []  # Probability of Action 1 (Bet/Call)
+
+    num_sets_found = 0
+    for key in info_sets_to_plot:
+        if key in info_set_map:
+            num_sets_found += 1
+            node = info_set_map[key] # Directly access since get_node creates if not found
+            avg_strategy = node.get_average_strategy()
+            labels.append(key)
+            pass_probs.append(avg_strategy[0])
+            bet_probs.append(avg_strategy[1])
+        else:
+            print(f"  Warning: Info set key '{key}' not found in map. Skipping.")
+
+    if num_sets_found == 0:
+        print("  No specified info sets were found to plot.")
+        return
+
+    x = np.arange(len(labels))  # Label locations
+    width = 0.35  # Width of the bars
+
+    fig, ax = plt.subplots(figsize=(10, 6)) # Create a figure and an axes.
+    # rects1 = ax.bar(x - width/2, pass_probs, width, label='Action 0 (Pass/Check/Fold)', color='skyblue')
+    # rects2 = ax.bar(x + width/2, bet_probs, width, label='Action 1 (Bet/Call)', color='lightcoral')
+
+    # Add some text for labels, title and axes ticks
+    ax.set_ylabel('Probability')
+    ax.set_title('Average Strategy (GTO) for Key Kuhn Poker Information Sets')
+    ax.set_xticks(x)
+    ax.set_xticklabels(labels)
+    ax.set_ylim(0, 1.05) # Y-axis from 0 to 1.05 for padding
+    ax.legend(loc='upper center', bbox_to_anchor=(0.5, -0.1), ncol=2) # Legend below chart
+
+    fig.tight_layout()
+
+    plt.show()
 
 
 # --- Call Training ---
 # Start with a decent number of iterations, can increase later
-NUM_ITERATIONS = 50000
+NUM_ITERATIONS = 100000
 train(NUM_ITERATIONS)
+
+# --- Plot Key Strategies After Training ---
+
+keys_to_plot = ['J', 'K', 'Q', 'Jb', 'Qb', 'Kb', 'Jp', 'Qp', 'Kp', 'Jpb', 'Qpb', 'Kpb']
+
+# Filter for keys that actually exist in the map after training
+existing_keys_to_plot = [key for key in keys_to_plot if key in info_set_map]
+plot_strategies(existing_keys_to_plot)
