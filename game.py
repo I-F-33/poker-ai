@@ -2,12 +2,12 @@ from pokerkit import KuhnPokerHand, Automation, State, Deck, Street, Opening, Be
 from random import random
 import numpy as np
 import matplotlib.pyplot as plt
+import matplotlib.patches as mpatches
 
 # --- Constants ---
 # Actions: 0 = Pass/Check/Fold, 1 = Bet/Call
 NUM_ACTIONS = 2
 
-# Using strings for cards as in your example
 CARDS = ['J', 'Q', 'K']
 NUM_CARDS = len(CARDS)
 
@@ -21,7 +21,7 @@ class CFRNode:
         # Stores cumulative strategy probabilities used so far
         self.strategy_sum = np.zeros(self.num_actions)
         # Unique key for this information set (e.g., "Kc", "Jcb")
-        self.info_set_key = "" # Will be set when node is created/retrieved
+        self.info_set_key = "" 
 
     def get_strategy(self):
         """ Calculate current strategy based on positive regrets """
@@ -46,9 +46,7 @@ class CFRNode:
     def __str__(self):
         """ String representation for debugging """
         avg_strategy_str = np.array2string(self.get_average_strategy(), formatter={'float_kind':lambda x: "%.2f" % x})
-        # Showing regret_sum can also be helpful for debugging
         return f"{self.info_set_key}: Avg Strat={avg_strategy_str}, Regret={self.regret_sum}"
-        #return f"{self.info_set_key}: Avg Strat={avg_strategy_str}"
 
 # --- Helper Function for Info Set Keys ---
 def get_information_set_key(card, history):
@@ -92,16 +90,12 @@ def cfr(cards, history, reach_probabilities, active_player):
     """
     opponent = 1 - active_player
 
-   # --- Revised Terminal State Checks ---
     # Check for folds first (these end the game immediately)
     if history.endswith('f'): # History is 'bf' or 'pbf'
-        # If P2 folded (history 'bf'), P0 payoff is +1 (wins P2's ante)
-        # If P1 folded (history 'pbf'), P0 payoff is -1 (loses P0's ante)
         payoff_p0 = 1 if history == 'bf' else -1
         return np.array([payoff_p0, -payoff_p0])
 
     # Check for showdowns (all other paths of length 2 or 3 end in showdown)
-    # Possible terminal histories reaching showdown: 'pp', 'bk', 'pbk'
     if history in ['pp', 'bk', 'pbk']:
         player0_card = cards[0]
         player1_card = cards[1]
@@ -117,8 +111,6 @@ def cfr(cards, history, reach_probabilities, active_player):
 
         # Return payoffs for (Player 0, Player 1)
         return np.array([payoff_p0, -payoff_p0])
-    # --- End Revised Terminal State Checks ---
-
 
     # --- Player Decision Node Logic ---
     info_set_key = get_information_set_key(cards[active_player], history)
@@ -130,7 +122,6 @@ def cfr(cards, history, reach_probabilities, active_player):
     assert len(legal_actions) == node.num_actions
 
     # Calculate expected value of this node using current strategy
-    # Also store expected value for each action (counterfactual values)
     action_utility_vectors = np.zeros((node.num_actions, 2)) # Store payoff vectors [P0, P1] for each action
     node_utility_vector = np.zeros(2)        # Store overall expected payoff vector [P0, P1] for this node
 
@@ -167,7 +158,7 @@ def cfr(cards, history, reach_probabilities, active_player):
     # Update strategy sum, weighted by current player's reach probability
     node.strategy_sum += reach_probabilities[active_player] * strategy
 
-    return node_utility_vector # Return expected payoffs [P0, P1] for this node
+    return node_utility_vector 
 
 
 # --- Training Loop ---
@@ -177,26 +168,22 @@ def train(iterations):
     print(f"Starting training for {iterations} iterations...")
     for i in range(iterations):
         # Shuffle deck randomly for each hand
-        # Using numpy shuffle for potentially better randomness
         np.random.shuffle(deck)
 
-        # Deal cards: P0 gets deck[0], P1 gets deck[1]
         # Ensure cards are passed as strings ('J', 'Q', 'K')
         current_cards = tuple(map(str, deck[0:2]))
 
         # Start recursion: initial history "", initial reach probs [1.0, 1.0], P0 active (0)
         utils += cfr(current_cards, "", np.ones(2), 0)
 
-        if (i + 1) % 10000 == 0: # Print progress
+        if (i + 1) % 10000 == 0: # Print progress every 10,000 iterations   
             print(f"  Iteration {i+1}/{iterations} completed.")
 
     print(f"\nTraining Complete over {iterations} iterations.")
     # Average game value is the sum of utilities divided by iterations
     avg_game_value_p0 = utils[0] / iterations
-    avg_game_value_p1 = utils[1] / iterations # Should be negative of P0's value
+    avg_game_value_p1 = utils[1] / iterations 
     print(f"Average Game Value (P0 perspective): {avg_game_value_p0:.4f}")
-    # For Kuhn Poker, the known theoretical value is -1/18 (~ -0.0556) for Player 0
-    # when both players play optimally.
 
     # Print final strategies
     print("\nFinal Average Strategies (Action 0: Pass/Check/Fold, Action 1: Bet/Call):")
@@ -206,17 +193,19 @@ def train(iterations):
         print("  No information sets were visited (check training loop/iterations).")
     else:
         for key, node in sorted_info_sets:
-            print(node) # Uses the __str__ method of CFRNode
+            print(node)
     
      # Calculate average game value
     avg_game_value_p0 = utils[0] / iterations
     avg_game_value_p1 = utils[1] / iterations
     print(f"Average Game Value (P0 perspective): {avg_game_value_p0:.4f}")
 
+    return avg_game_value_p0
+
     
 
 # --- Function to Plot Strategies ---
-def plot_strategies(info_sets_to_plot):
+def plot_strategies(info_sets_to_plot, avg_game_value):
     """ Generates bar charts for the average strategy of specified info sets """
     print("\nGenerating strategy plots...")
 
@@ -240,35 +229,55 @@ def plot_strategies(info_sets_to_plot):
         print("  No specified info sets were found to plot.")
         return
 
-    x = np.arange(len(labels))  # Label locations
-    width = 0.35  # Width of the bars
+    x = np.arange(len(labels)) 
+    width = 0.35  
 
-    fig, ax = plt.subplots(figsize=(10, 6)) # Create a figure and an axes.
-    # rects1 = ax.bar(x - width/2, pass_probs, width, label='Action 0 (Pass/Check/Fold)', color='skyblue')
-    # rects2 = ax.bar(x + width/2, bet_probs, width, label='Action 1 (Bet/Call)', color='lightcoral')
+    fig, ax = plt.subplots(figsize=(10, 6)) 
+    rects1 = ax.bar(x - width/2, pass_probs, width, label='Action 0 (Pass/Check/Fold)', color='skyblue')
+    rects2 = ax.bar(x + width/2, bet_probs, width, label='Action 1 (Bet/Call)', color='lightcoral')
+    ax.bar_label(rects1, padding=3, fmt='%.2f')
+    ax.bar_label(rects2, padding=3, fmt='%.2f')
+    
 
     # Add some text for labels, title and axes ticks
+    ax.set_ylabel('Probability of Action')
     ax.set_ylabel('Probability')
     ax.set_title('Average Strategy (GTO) for Key Kuhn Poker Information Sets')
     ax.set_xticks(x)
     ax.set_xticklabels(labels)
-    ax.set_ylim(0, 1.05) # Y-axis from 0 to 1.05 for padding
-    ax.legend(loc='upper center', bbox_to_anchor=(0.5, -0.1), ncol=2) # Legend below chart
+    ax.set_ylim(0, 1.05) 
+    # Prepare the text for the game value
+    theoretical_value = -1/18
+    game_value_text = f'Avg Game Value (P0): {avg_game_value:.4f} (Theoretical: {theoretical_value:.4f})'
 
+    # Get existing handles and labels from the bars
+    handles, existing_labels = ax.get_legend_handles_labels()
+
+    # Create a dummy artist for our text (it won't be visible on the plot)
+    game_value_patch = mpatches.Patch(color='none', label=game_value_text)
+
+    # Append the dummy patch and its label to the existing ones
+    handles.append(game_value_patch)
+    existing_labels.append(game_value_text) 
+
+    # Create the legend with the combined handles and labels
+    ax.legend(handles=handles, labels=existing_labels, 
+              loc='upper center', bbox_to_anchor=(0.5, -0.15), ncol=3) # ncol=1 to stack them vertically
     fig.tight_layout()
 
     plt.show()
 
 
+
 # --- Call Training ---
-# Start with a decent number of iterations, can increase later
-NUM_ITERATIONS = 100000
-train(NUM_ITERATIONS)
+NUM_ITERATIONS = 100000 
+final_avg_game_value = train(NUM_ITERATIONS) # Capture the returned value
 
 # --- Plot Key Strategies After Training ---
-
 keys_to_plot = ['J', 'K', 'Q', 'Jb', 'Qb', 'Kb', 'Jp', 'Qp', 'Kp', 'Jpb', 'Qpb', 'Kpb']
-
-# Filter for keys that actually exist in the map after training
 existing_keys_to_plot = [key for key in keys_to_plot if key in info_set_map]
-plot_strategies(existing_keys_to_plot)
+
+if existing_keys_to_plot: 
+    plot_strategies(existing_keys_to_plot, final_avg_game_value) 
+else:
+    print("\nNo strategies found in map to plot.")
