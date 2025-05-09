@@ -141,7 +141,7 @@ Essentially, `train` drives the process over many games. `cfr` explores possibil
 3.  Save the code as a Python file (e.g., `kuhn_cfr.py`).
 4.  Run the script from your terminal:
     ```bash
-    python kuhn_cfr.py
+    python game.py
     ```
     The script will print training progress, final average strategies for all info sets, the average game value, and then display a plot of key strategies.
 
